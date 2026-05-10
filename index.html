@@ -12,7 +12,7 @@
 <!-- ⚠️ IMPORTANTE: Reemplaza YOUR_API_KEY con tu clave real de Anthropic -->
 <!-- Obtén tu clave en: https://console.anthropic.com -->
 <script>
-  const ANTHROPIC_API_KEY = 'YOUR_API_KEY';
+  const GEMINI_API_KEY = 'AIzaSyDUs-0cakGNa4GXeyuKBpTXcXaIoFC3bEY';
 </script>
 
 <style>
@@ -510,11 +510,7 @@
   <main>
   <section class="panel active" id="panel-ia" role="tabpanel">
 
-    <div id="apiBanner" class="api-banner" style="display:none">
-      <strong>⚠️ API Key requerida</strong>
-      Edita el archivo <code>index.html</code> y reemplaza <code>YOUR_API_KEY</code>
-      con tu clave de <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.
-    </div>
+    
 
     <div class="card">
       <div class="card-title">🤖 Asistente de Zonas Verdes</div>
@@ -718,31 +714,47 @@ function checkApiKey() {
 // ════════════════════════════════════════
 // CLAUDE API
 // ════════════════════════════════════════
-async function callClaude(messages, system, imageData = null) {
-  if (!checkApiKey()) throw new Error('API Key no configurada');
+async function callGemini(messages, system, imageData = null) {
 
-  const msgs = imageData
-    ? [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: imageData.type, data: imageData.data } },
-        { type: 'text', text: messages[messages.length - 1].content }
-      ]}]
-    : messages;
+  if (!GEMINI_API_KEY) {
+    throw new Error('API Key no configurada');
+  }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system,
-      messages: msgs
-    })
+  let userMessage = messages[messages.length - 1].content;
+
+  let parts = [];
+
+  // Texto
+  parts.push({
+    text: `${system}\n\nUsuario: ${userMessage}`
   });
+
+  // Imagen opcional
+  if (imageData) {
+    parts.push({
+      inline_data: {
+        mime_type: imageData.type,
+        data: imageData.data
+      }
+    });
+  }
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: parts
+          }
+        ]
+      })
+    }
+  );
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -750,9 +762,9 @@ async function callClaude(messages, system, imageData = null) {
   }
 
   const data = await res.json();
-  return data.content?.[0]?.text || 'Sin respuesta.';
-}
 
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+}
 // ════════════════════════════════════════
 // CHAT IA
 // ════════════════════════════════════════
@@ -790,7 +802,7 @@ async function sendMessage() {
 
   const typingEl = addTyping();
   try {
-    const reply = await callClaude(chatHistory, SYSTEM_IA);
+    const reply = await callGemini(chatHistory, SYSTEM_IA);
     typingEl.remove();
     addMsg(reply, 'ai');
     chatHistory.push({ role: 'assistant', content: reply });
@@ -879,7 +891,7 @@ async function analyzeImage(b64, mtype, dataUrl) {
   document.getElementById('analysisResult').textContent = '🔍 Analizando con IA...';
 
   try {
-    const result = await callClaude(
+    const result = await callGemini(
       [{ role: 'user', content: '¿Qué planta o zona verde es esta? ¿Estado de salud? ¿Qué recomiendas?' }],
       SYSTEM_CAM,
       { data: b64, type: mtype }
