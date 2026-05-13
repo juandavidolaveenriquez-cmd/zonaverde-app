@@ -13,7 +13,7 @@
 <!-- Obtén tu clave en: https://console.anthropic.com -->
 <script>
 
-const MODEL_NAME = "deepseek/deepseek-chat-v3-0324";
+const MODEL_NAME = "meta-llama/llama-3-8b-instruct";
 const API_KEY = "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";
 
 async function sendMessage() {
@@ -789,40 +789,33 @@ function checkApiKey() {
 // ════════════════════════════════════════
 async function callGemini(messages, system, imageData = null) {
 
-  if (!API_KEY) { 
+  if (!API_KEY) {
     throw new Error('API Key no configurada');
   }
 
   let userMessage = messages[messages.length - 1].content;
 
-  let parts = [];
+  let content = `${system}\n\nUsuario: ${userMessage}`;
 
-  // Texto
-  parts.push({
-    text: `${system}\n\nUsuario: ${userMessage}`
-  });
-
-  // Imagen opcional
+  // Si hay imagen
   if (imageData) {
-    parts.push({
-      inline_data: {
-        mime_type: imageData.type,
-        data: imageData.data
-      }
-    });
+    content += "\n\n[Imagen enviada para análisis]";
   }
 
   const res = await fetch(
-    
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        contents: [
+        model: MODEL_NAME,
+        messages: [
           {
-            parts: parts
+            role: 'user',
+            content: content
           }
         ]
       })
@@ -836,7 +829,7 @@ async function callGemini(messages, system, imageData = null) {
 
   const data = await res.json();
 
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+  return data.choices?.[0]?.message?.content || 'Sin respuesta.';
 }
 // ════════════════════════════════════════
 // CHAT IA
